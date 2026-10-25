@@ -31,6 +31,13 @@ const CLOCK = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", ho
 
 type PlayerStatus = { state: number; time: number };
 
+/** The window and current player's sizes, for the diagnostics panel. */
+function layoutNote(): string {
+  const box = document.querySelector(".live-cams__cam--current .live-cams__box");
+  const frame = document.querySelector(".live-cams__cam--current iframe")?.getBoundingClientRect();
+  return `window ${innerWidth}x${innerHeight} @${devicePixelRatio} · box ${box ? `${box.clientWidth}x${box.clientHeight}` : "-"} · player ${frame ? `${Math.round(frame.left)},${Math.round(frame.top)} ${Math.round(frame.width)}x${Math.round(frame.height)}` : "-"}`;
+}
+
 /**
  * The cam's YouTube player (muted, no controls), drawn big enough to cover its box, framed by the
  * cam's crop. It asks to play every few seconds until it does (a slow device can miss the first
@@ -251,6 +258,8 @@ export function LiveCams() {
               ? `${cam.shortLabel} ${cam.videoId}${playing[keyOf(cam)] ? " SHOWN" : ""} ${status ? `${STATE_NAMES[status.state] ?? status.state} t=${status.time}` : "not ready"}${offline(cam) ? " OFFLINE" : ""}`
               : "no stream on"}
             {turn?.next ? ` · next ${turn.next.shortLabel} in ${Math.ceil(turn.msLeft / 1000)}s${upcoming ? (playing[keyOf(upcoming)] ? " (ready)" : " (loading)") : ""}` : ""}
+            {"\n"}
+            {layoutNote()}
             {"\n"}
             {events.join("\n") || "no failures"}
             {"\n"}
