@@ -1,0 +1,170 @@
+:root {
+  /* 1 design pixel, on a 960 x 540 design: the bar's sizes follow the screen. */
+  --u: min(calc(100vw / 960), calc(100dvh / 540));
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  cursor: none;
+}
+
+.app-shell {
+  width: 100vw;
+  height: 100dvh;
+}
+
+/* One live cam covering everything above the CHICAGO LIVE bar (the 16:9 picture cropped to fit). */
+.live-cams {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.live-cams__screen {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The cam's player, hidden until it's playing, then fading in. */
+.live-cams__cam {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+.live-cams__cam--shown {
+  opacity: 1;
+}
+
+/* The cam's space. The player inside covers it, cutting the top of each picture (13% unless the cam
+   says otherwise: some, like the River's, draw their own weather band there); any extra is cropped at
+   the sides, around the cam's centre point, or at the bottom (see camFrame). */
+.live-cams__box {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* The player, placed and sized in pixels by camFrame. Never a transform: the Fire TV ignores them for video. */
+.live-cams__player {
+  position: absolute;
+}
+
+.live-cams__player iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Diagnostics (?debug=1): the player state, recent failures and the browser. */
+.live-cams__debug {
+  position: absolute;
+  top: calc(8 * var(--u));
+  left: calc(8 * var(--u));
+  right: calc(8 * var(--u));
+  z-index: 2;
+  margin: 0;
+  padding: calc(8 * var(--u));
+  background: rgba(0, 0, 0, 0.75);
+  color: #9cff9c;
+  font: calc(12 * var(--u)) / 1.35 monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.live-cams__offline {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 calc(40 * var(--u));
+  color: #c9d4ee;
+  font-size: calc(28 * var(--u));
+  font-weight: 700;
+  text-align: center;
+}
+
+/* CHICAGO LIVE: a dark blue bar under the video, edged in white. */
+.live-cams__label {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: calc(52 * var(--u));
+  padding: 0 calc(20 * var(--u));
+  box-sizing: border-box;
+  border-top: calc(2 * var(--u)) solid #ffffff;
+  background: #13295a;
+  color: #ffffff;
+  font-size: calc(24 * var(--u));
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+/* A red six-pointed star, as on the Chicago flag, pulsing like an on-air light. */
+.live-cams__star {
+  flex: none;
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+  margin-right: calc(10 * var(--u));
+  fill: #e4002b;
+  filter: drop-shadow(0 0 calc(2 * var(--u)) rgba(255, 255, 255, 0.35));
+  animation: live-star-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes live-star-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
+.live-cams__title {
+  letter-spacing: 0.01em;
+}
+
+/* The cam's name, after a divider. A long name ends in "…" rather than pushing the time off the bar. */
+.live-cams__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: calc(14 * var(--u));
+  padding-left: calc(14 * var(--u));
+  border-left: calc(2 * var(--u)) solid rgba(201, 212, 238, 0.5);
+  color: #c9d4ee;
+}
+
+.live-cams__time {
+  margin-left: auto;
+  padding-left: calc(14 * var(--u));
+  font-variant-numeric: tabular-nums;
+}
+
+.fade-in {
+  animation: fade-in 0.6s ease both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
