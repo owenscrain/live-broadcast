@@ -40,12 +40,12 @@ body {
   overflow: hidden;
 }
 
-/* The cam's player, hidden until it's playing, then fading in. */
+/* The cam's player, hidden until it's playing, then fading in over the last one in half a second. */
 .live-cams__cam {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 1s ease;
+  transition: opacity 0.5s ease-in-out;
 }
 
 .live-cams__cam--shown {

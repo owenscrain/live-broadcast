@@ -21,7 +21,7 @@ const SETTINGS_REFRESH_MS = 60_000;
 /** The next cam's player starts this long before its turn, so it's already playing when it's shown... */
 const PRELOAD_MS = 10_000;
 /** ...and the last one stays under it this long, while the new one fades in. */
-const FADE_MS = 1_500;
+const FADE_MS = 1_000;
 
 const STATE_NAMES: Record<number, string> = { [-1]: "unstarted", 0: "ended", 1: "playing", 2: "paused", 3: "buffering", 5: "cued" };
 /** Unstarted, paused or cued: the states a "play" nudge is for. */
