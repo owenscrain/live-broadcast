@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CAMS } from "@/lib/cams";
-import { DEFAULT_SETTINGS, camAt, monthKey, normalizeSettings } from "@/lib/settings";
+import { DEFAULT_SETTINGS, camAt, monthKey, normalizeSettings, turnAt } from "@/lib/settings";
 
 const river = CAMS[0];
 const midway = CAMS[1];
@@ -10,7 +10,16 @@ describe("camAt", () => {
     const settings = { cams: CAMS, turnMinutes: 10 };
     expect(camAt(settings, 0)?.id).toBe("river");
     expect(camAt(settings, 10 * 60_000)?.id).toBe("midway");
-    expect(camAt(settings, 20 * 60_000)?.id).toBe("river");
+    expect(camAt(settings, 20 * 60_000)?.id).toBe("lakefront");
+    expect(camAt(settings, 30 * 60_000)?.id).toBe("river");
+  });
+
+  it("says which cam is next and when", () => {
+    const turn = turnAt({ cams: CAMS, turnMinutes: 1 }, 2 * 60_000 + 50_000);
+    expect(turn?.cam.id).toBe("lakefront");
+    expect(turn?.next?.id).toBe("river");
+    expect(turn?.msLeft).toBe(10_000);
+    expect(turnAt({ cams: [river], turnMinutes: 1 }, 0)?.next).toBeNull();
   });
 
   it("shows the one cam on, or none", () => {

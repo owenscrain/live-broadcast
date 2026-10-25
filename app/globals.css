@@ -52,6 +52,11 @@ body {
   opacity: 1;
 }
 
+/* The cam on screen sits over the one fading out and the one warming up. */
+.live-cams__cam--current {
+  z-index: 1;
+}
+
 /* The cam's space. The player inside covers it, cutting the top of each picture (13% unless the cam
    says otherwise: some, like the River's, draw their own weather band there); any extra is cropped at
    the sides, around the cam's centre point, or at the bottom (see camFrame). */

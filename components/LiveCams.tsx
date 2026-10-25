@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CAMS, CAMS_REFRESH_MS, camFrame, camPlayerVars, type Cam, type LiveCamsResponse } from "@/lib/cams";
-import { DEFAULT_SETTINGS, camAt, type Settings, type SettingsResponse } from "@/lib/settings";
+import { DEFAULT_SETTINGS, turnAt, type Settings, type SettingsResponse } from "@/lib/settings";
 import { YT_PLAYING, loadYouTubeApi, type YTPlayer } from "@/lib/youtube-player";
 
 /** A six-pointed star, as on the Chicago flag, on a 100 x 100 grid. */
@@ -18,6 +18,10 @@ const CHECK_MS = 3_000;
 const RETRY_MS = 2 * 60_000;
 /** How often the screen checks for new settings from /controller. */
 const SETTINGS_REFRESH_MS = 60_000;
+/** The next cam's player starts this long before its turn, so it's already playing when it's shown... */
+const PRELOAD_MS = 10_000;
+/** ...and the last one stays under it this long, while the new one fades in. */
+const FADE_MS = 1_500;
 
 const STATE_NAMES: Record<number, string> = { [-1]: "unstarted", 0: "ended", 1: "playing", 2: "paused", 3: "buffering", 5: "cued" };
 /** Unstarted, paused or cued: the states a "play" nudge is for. */
@@ -124,19 +128,20 @@ function CamPlayer({
 }
 
 /**
- * The whole screen: one live cam covering everything above the CHICAGO LIVE bar (the picture
- * cropped to fit). The cams are the ones switched on in /controller, taking turns when there are
- * several (?cam= picks one instead). The video fades in once it's playing; if it fails, an "offline" note shows for 2 minutes and then it's
- * tried again. A stream that follows its channel is looked up through /api/live-cams (every 10
- * minutes, and after a failure), since a restarted stream comes back under a new video ID. Under the
- * video, the dark blue CHICAGO LIVE bar, with a pulsing Chicago-flag star, the cam's name and the
- * time. ?debug=1 shows a diagnostics panel.
+ * The whole screen: a live cam covering everything above the CHICAGO LIVE bar (the picture cropped
+ * to fit). The cams switched on take turns (a minute each to start with; ?cam= picks one instead).
+ * The next cam's player starts, hidden, 10 seconds before its turn, so it's already playing when it
+ * fades in over the last one (?preload=0 turns that off). If a cam fails, an "offline" note shows
+ * in its turns for 2 minutes and then it's tried again. A stream that follows its channel is looked
+ * up through /api/live-cams (every 10 minutes, and after a failure), since a restarted stream comes
+ * back under a new video ID. Under the video, the dark blue CHICAGO LIVE bar, with a pulsing
+ * Chicago-flag star, the cam's name and the time. ?debug=1 shows a diagnostics panel.
  */
 export function LiveCams() {
-  const [params, setParams] = useState<{ cam: string | null; debug: boolean } | null>(null);
+  const [params, setParams] = useState<{ cam: string | null; debug: boolean; preload: boolean } | null>(null);
   useEffect(() => {
     const search = new URLSearchParams(window.location.search);
-    setParams({ cam: search.get("cam"), debug: search.has("debug") });
+    setParams({ cam: search.get("cam"), debug: search.has("debug"), preload: search.get("preload") !== "0" });
   }, []);
 
   const [now, setNow] = useState<number | null>(null);
@@ -159,70 +164,93 @@ export function LiveCams() {
     return () => clearInterval(id);
   }, []);
 
+  // The cam on screen, the one warming up for the next turn, and (just after a switch) the one fading out under it.
   const picked = params?.cam ? (settings?.cams ?? CAMS).find((c) => c.id === params.cam) ?? CAMS.find((c) => c.id === params.cam) : null;
-  const stream = picked ?? (settings && now !== null ? camAt(settings, now) : null);
-  const channel = stream && stream.followChannel !== false ? stream.channelId : null;
-  const [currentIds, setCurrentIds] = useState<Record<string, string | null>>({});
-  const currentId = channel ? currentIds[channel] : null;
-  const cam = stream && { ...stream, videoId: currentId || stream.videoId };
+  const turn = picked ? { cam: picked, next: null, msLeft: Infinity } : settings && now !== null ? turnAt(settings, now) : null;
+  const before = !picked && settings && now !== null ? turnAt(settings, now - FADE_MS)?.cam : null;
+  const previous = before && before.id !== turn?.cam.id ? before : null;
+  const upcoming = params?.preload && turn?.next && turn.msLeft <= PRELOAD_MS ? turn.next : null;
 
+  // Each followed channel's current stream, looked up together.
+  const channels = [...new Set((picked ? [picked] : settings?.cams.filter((c) => c.on) ?? []).filter((c) => c.followChannel !== false).map((c) => c.channelId))].join(",");
+  const [currentIds, setCurrentIds] = useState<Record<string, string | null>>({});
   const lookUp = useCallback(async () => {
-    if (!channel) return;
+    if (!channels) return;
     try {
-      const res = (await fetch(`/api/live-cams?channels=${channel}`).then((r) => r.json())) as LiveCamsResponse;
-      if (res.ok) setCurrentIds((ids) => ({ ...ids, [channel]: res.streams[channel] ?? null }));
+      const res = (await fetch(`/api/live-cams?channels=${channels}`).then((r) => r.json())) as LiveCamsResponse;
+      if (res.ok) setCurrentIds((ids) => ({ ...ids, ...res.streams }));
     } catch {
-      // Keep the stream we have.
+      // Keep the streams we have.
     }
-  }, [channel]);
+  }, [channels]);
   useEffect(() => {
     lookUp();
     const id = setInterval(lookUp, CAMS_REFRESH_MS);
     return () => clearInterval(id);
   }, [lookUp]);
+  const withStream = (c: Cam): Cam => ({ ...c, videoId: (c.followChannel !== false && currentIds[c.channelId]) || c.videoId });
 
-  const [playing, setPlaying] = useState(false);
-  const [failedAt, setFailedAt] = useState<number | null>(null);
-  const [attempt, setAttempt] = useState(0);
+  const [playing, setPlaying] = useState<Record<string, true>>({});
+  const [failedAt, setFailedAt] = useState<Record<string, number>>({});
+  const [attempts, setAttempts] = useState<Record<string, number>>({});
   const [status, setStatus] = useState<PlayerStatus | null>(null);
   const [events, setEvents] = useState<string[]>([]);
-  // Shown once it first plays (a moment of buffering doesn't hide it); a new stream or retry starts hidden.
-  const onPlaying = useCallback((isPlaying: boolean) => isPlaying && setPlaying(true), []);
-  const playerKey = cam ? `${cam.videoId}:${attempt}` : null;
-  useEffect(() => setPlaying(false), [playerKey]);
+  const offline = (c: Cam) => failedAt[c.id] !== undefined && (now ?? 0) - failedAt[c.id] < RETRY_MS;
+  const keyOf = (c: Cam) => `${c.id}:${withStream(c).videoId}:${attempts[c.id] ?? 0}`;
   const onFail = useCallback(
-    (reason: string) => {
-      setEvents((e) => [`${new Date().toLocaleTimeString()} ${reason}`, ...e].slice(0, 5));
-      setPlaying(false);
-      setFailedAt((at) => at ?? Date.now());
+    (c: Cam, key: string, reason: string) => {
+      setEvents((e) => [`${new Date().toLocaleTimeString()} ${c.shortLabel} ${reason}`, ...e].slice(0, 5));
+      setPlaying(({ [key]: _, ...rest }) => rest);
+      setFailedAt((f) => (c.id in f ? f : { ...f, [c.id]: Date.now() }));
       lookUp();
     },
     [lookUp],
   );
   // After a failure, try again in a couple of minutes, with a fresh player.
-  const offline = failedAt !== null && (now ?? 0) - failedAt < RETRY_MS;
   useEffect(() => {
-    if (failedAt !== null && !offline) {
-      setFailedAt(null);
-      setAttempt((a) => a + 1);
-    }
-  }, [failedAt, offline]);
+    const due = Object.entries(failedAt).filter(([, at]) => (now ?? 0) - at >= RETRY_MS);
+    if (due.length === 0) return;
+    setFailedAt((f) => Object.fromEntries(Object.entries(f).filter(([id]) => !due.some(([d]) => d === id))));
+    setAttempts((a) => ({ ...a, ...Object.fromEntries(due.map(([id]) => [id, (a[id] ?? 0) + 1])) }));
+  }, [failedAt, now]);
+
+  // Oldest first, which is also the order they were started in, so React never moves one (moving an iframe reloads it).
+  const players = [previous, turn?.cam, upcoming].filter((c, i, all): c is Cam => !!c && !offline(c) && all.findIndex((o) => o?.id === c.id) === i);
+  const playerKeys = players.map(keyOf).join(" ");
+  // Forget players that are gone (the screen runs for weeks).
+  useEffect(() => {
+    const live = new Set(playerKeys.split(" "));
+    setPlaying((p) => (Object.keys(p).every((k) => live.has(k)) ? p : Object.fromEntries(Object.entries(p).filter(([k]) => live.has(k)))));
+  }, [playerKeys]);
 
   if (now === null || !params || (!settings && !picked)) return <div className="live-cams" />;
+  const cam = turn ? withStream(turn.cam) : null;
+  const shown = (c: Cam) => !!playing[keyOf(c)] && (c.id === turn?.cam.id || c.id === previous?.id);
   return (
     <div className="live-cams" aria-label={cam ? `Live cam: ${cam.label}` : "Live cams off"}>
       <div className="live-cams__screen">
-        {cam && !offline && (
-          <div className={`live-cams__cam${playing ? " live-cams__cam--shown" : ""}`}>
-            <CamPlayer key={playerKey} cam={cam} onPlaying={onPlaying} onFail={onFail} onStatus={setStatus} />
-          </div>
-        )}
-        {(!cam || offline) && <p className="live-cams__offline">{cam ? "The live cam is offline right now." : "No live cam is turned on."}</p>}
+        {cam && offline(cam) && <p className="live-cams__offline">The live cam is offline right now.</p>}
+        {!cam && <p className="live-cams__offline">No live cam is turned on.</p>}
+        {players.map((c) => {
+          const key = keyOf(c);
+          const current = c.id === turn?.cam.id;
+          return (
+            <div key={key} className={`live-cams__cam${shown(c) ? " live-cams__cam--shown" : ""}${current ? " live-cams__cam--current" : ""}`}>
+              <CamPlayer
+                cam={withStream(c)}
+                onPlaying={(isPlaying) => isPlaying && setPlaying((p) => (p[key] ? p : { ...p, [key]: true }))}
+                onFail={(reason) => onFail(c, key, reason)}
+                onStatus={(s) => current && setStatus(s)}
+              />
+            </div>
+          );
+        })}
         {params.debug && (
           <pre className="live-cams__debug">
             {cam
-              ? `${cam.shortLabel} ${cam.videoId}${playing ? " SHOWN" : ""} ${status ? `${STATE_NAMES[status.state] ?? status.state} t=${status.time}` : "not ready"}${offline ? " OFFLINE" : ""}`
+              ? `${cam.shortLabel} ${cam.videoId}${playing[keyOf(cam)] ? " SHOWN" : ""} ${status ? `${STATE_NAMES[status.state] ?? status.state} t=${status.time}` : "not ready"}${offline(cam) ? " OFFLINE" : ""}`
               : "no stream on"}
+            {turn?.next ? ` · next ${turn.next.shortLabel} in ${Math.ceil(turn.msLeft / 1000)}s${upcoming ? (playing[keyOf(upcoming)] ? " (ready)" : " (loading)") : ""}` : ""}
             {"\n"}
             {events.join("\n") || "no failures"}
             {"\n"}

@@ -18,7 +18,7 @@ export type StoreStatus = { persistent: boolean; writable: boolean; problem: str
 
 export const TURN_CHOICES = [1, 5, 10, 15, 30, 60];
 
-export const DEFAULT_SETTINGS: Settings = { cams: CAMS, turnMinutes: 10 };
+export const DEFAULT_SETTINGS: Settings = { cams: CAMS, turnMinutes: 1 };
 
 /** Room for this many streams. */
 export const MAX_CAMS = 12;
@@ -79,9 +79,19 @@ export function normalizeSettings(value: unknown): Settings {
  * none is on.
  */
 export function camAt(settings: Settings, now: number): Cam | null {
+  return turnAt(settings, now)?.cam ?? null;
+}
+
+/**
+ * The turn at `now`: the cam on screen, the one after it (null if it's the only one on), and how
+ * long until the switch. Null if none is on.
+ */
+export function turnAt(settings: Settings, now: number): { cam: Cam; next: Cam | null; msLeft: number } | null {
   const on = settings.cams.filter((c) => c.on);
   if (on.length === 0) return null;
-  return on[Math.floor(now / (settings.turnMinutes * 60_000)) % on.length];
+  const turnMs = settings.turnMinutes * 60_000;
+  const slot = Math.floor(now / turnMs);
+  return { cam: on[slot % on.length], next: on.length > 1 ? on[(slot + 1) % on.length] : null, msLeft: turnMs - (now % turnMs) };
 }
 
 /** This month in Chicago, as "2026-10". */

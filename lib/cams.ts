@@ -44,6 +44,8 @@ export const CAMS: Cam[] = [
     crop: { top: 0.13, centerX: 0.287 },
     on: true,
   },
+  // Lakefront Live restarts its stream about every 12 hours under a new ID, so it follows the channel.
+  { id: "lakefront", label: "Chicago Lakefront", shortLabel: "Lakefront", videoId: "oAdkuNoSmrM", channelId: "UCKrTulUx22nWscKWpQarAOQ", on: true },
 ];
 
 /** How much of the top of each picture is cut off by default, and the default point kept in the middle. */

@@ -1,7 +1,9 @@
 # Chicago Live
 
-A Chicago live cam, full screen on a landscape TV, with a dark blue **CHICAGO LIVE** bar along the
-bottom: a pulsing Chicago-flag star, the cam's short name, and the time.
+Chicago live cams, full screen on a landscape TV, taking turns a minute each (River, MDW,
+Lakefront), with a dark blue **CHICAGO LIVE** bar along the bottom: a pulsing Chicago-flag star,
+the cam's short name, and the time. The next cam's player starts hidden 10 seconds before its turn,
+so it's already playing when it fades in.
 
 The video streams from YouTube straight to the screen, so it costs no Vercel bandwidth. The only
 server work is `/api/live-cams`, a lookup of a channel's current stream, CDN-cached for 10 minutes.
@@ -12,7 +14,8 @@ server work is `/api/live-cams`, a lookup of a channel's current stream, CDN-cac
 |---|---|
 | `/` | The screen: the cams switched on in the controller, taking turns when there are several |
 | `/?cam=midway` | That cam only (any cam's ID) |
-| `/?debug=1` | A diagnostics panel: stream ID, player state, recent failures, browser |
+| `/?debug=1` | A diagnostics panel: stream ID, player state, the next cam and whether it's ready, recent failures, browser |
+| `/?preload=0` | No preloading: one player at a time (if two at once misbehave on the Fire TV) |
 | `/controller` | The controller: switch streams on and off, set their order and turn length, add one by YouTube link, remove one. No passcode: anyone with the link can use it. |
 
 Changes on the controller stay there until **Save**. The screen checks every minute. With several
