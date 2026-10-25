@@ -9,6 +9,8 @@ export type YTPlayer = {
   mute(): void;
   getPlayerState(): number;
   getCurrentTime(): number;
+  /** The stream's current quality ("hd1080", "hd720"…), as YouTube reports it. Deprecated by YouTube, so it may be missing. */
+  getPlaybackQuality?(): string;
   destroy(): void;
 };
 

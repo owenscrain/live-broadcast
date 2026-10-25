@@ -29,7 +29,7 @@ const STOPPED = new Set([-1, 2, 5]);
 
 const CLOCK = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" });
 
-type PlayerStatus = { state: number; time: number };
+type PlayerStatus = { state: number; time: number; quality: string };
 
 /** The window and current player's sizes, for the diagnostics panel. */
 function layoutNote(): string {
@@ -113,7 +113,7 @@ function CamPlayer({
     const id = setInterval(() => {
       const state = p.getPlayerState();
       const time = p.getCurrentTime();
-      callbacks.current.onStatus({ state, time: Math.round(time) });
+      callbacks.current.onStatus({ state, time: Math.round(time), quality: p.getPlaybackQuality?.() || "?" });
       if (state === YT_PLAYING && time !== lastTime) movedAt = Date.now();
       lastTime = time;
       // Only when it's stopped: asking again while it's buffering can restart the load.
@@ -255,7 +255,7 @@ export function LiveCams() {
         {params.debug && (
           <pre className="live-cams__debug">
             {cam
-              ? `${cam.shortLabel} ${cam.videoId}${playing[keyOf(cam)] ? " SHOWN" : ""} ${status ? `${STATE_NAMES[status.state] ?? status.state} t=${status.time}` : "not ready"}${offline(cam) ? " OFFLINE" : ""}`
+              ? `${cam.shortLabel} ${cam.videoId}${playing[keyOf(cam)] ? " SHOWN" : ""} ${status ? `${STATE_NAMES[status.state] ?? status.state} t=${status.time} ${status.quality}` : "not ready"}${offline(cam) ? " OFFLINE" : ""}`
               : "no stream on"}
             {turn?.next ? ` · next ${turn.next.shortLabel} in ${Math.ceil(turn.msLeft / 1000)}s${upcoming ? (playing[keyOf(upcoming)] ? " (ready)" : " (loading)") : ""}` : ""}
             {"\n"}
