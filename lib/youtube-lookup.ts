@@ -16,3 +16,16 @@ export async function currentStream(channelId: string): Promise<string | null> {
   const streams = await fetch(`https://www.youtube.com/channel/${channelId}/streams`, PAGE).then((r) => (r.ok ? r.text() : ""));
   return streams.match(/"videoId":"([\w-]{11})"/)?.[1] ?? null;
 }
+
+/**
+ * What YouTube says about a video: its title, and its channel. Null if it doesn't exist or can't be
+ * embedded on other sites (YouTube's oEmbed answers neither).
+ */
+export async function videoInfo(videoId: string): Promise<{ title: string; channelId: string } | null> {
+  const oembed = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`);
+  if (!oembed.ok) return null;
+  const { title } = (await oembed.json()) as { title?: string };
+  const page = await fetch(`https://www.youtube.com/watch?v=${videoId}`, { headers: { "Accept-Language": "en-US" } }).then((r) => (r.ok ? r.text() : ""));
+  const channelId = page.match(/"channelId":"(UC[\w-]{22})"/)?.[1];
+  return channelId && isChannelId(channelId) ? { title: title ?? "Live stream", channelId } : null;
+}

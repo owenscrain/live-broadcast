@@ -6,17 +6,22 @@
 html,
 body {
   margin: 0;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
   background: #000;
   color: #fff;
   font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
-  cursor: none;
 }
 
+body {
+  overflow: auto;
+}
+
+/* The screen: the whole window, no scrolling, no pointer. */
 .app-shell {
-  width: 100vw;
-  height: 100dvh;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: none;
 }
 
 /* One live cam covering everything above the CHICAGO LIVE bar (the 16:9 picture cropped to fit). */
@@ -167,4 +172,271 @@ body {
   from {
     opacity: 0;
   }
+}
+
+/* The controller (/controller): a plain page for a phone or laptop, in the CHICAGO LIVE colours. */
+.controller {
+  --c-card: #13295a;
+  --c-line: rgba(201, 212, 238, 0.22);
+  --c-muted: #a9b7d8;
+  --c-accent: #e4002b;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 16px 160px;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.controller h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.controller h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.controller__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.controller a {
+  color: #c9d4ee;
+}
+
+.controller__card {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  background: var(--c-card);
+}
+
+.controller__muted {
+  color: var(--c-muted);
+  font-size: 14px;
+}
+
+.controller__error {
+  margin: 8px 0 0;
+  color: #ffb3c0;
+  font-size: 14px;
+}
+
+.controller__warning {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #4a3500;
+  color: #ffe3a3;
+  font-size: 14px;
+}
+
+.controller__now {
+  margin: 0;
+}
+
+.controller__dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  animation: live-star-pulse 1.4s ease-in-out infinite;
+}
+
+.controller__list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.controller__cam {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--c-line);
+}
+
+.controller__toggle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.controller__toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.controller__switch {
+  flex: none;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background 0.2s;
+}
+
+.controller__switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.2s;
+}
+
+.controller__toggle input:checked + .controller__switch {
+  background: var(--c-accent);
+}
+
+.controller__toggle input:checked + .controller__switch::after {
+  left: 21px;
+}
+
+.controller__toggle input:focus-visible + .controller__switch {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.controller__names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.controller__names > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controller__actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.controller button,
+.controller__actions a {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.controller__actions a,
+.controller__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  text-decoration: none;
+}
+
+.controller button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.controller .controller__primary {
+  border-color: var(--c-accent);
+  background: var(--c-accent);
+  font-weight: 700;
+}
+
+.controller__turns {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--c-line);
+}
+
+.controller select,
+.controller input:not([type="checkbox"]) {
+  box-sizing: border-box;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+  background: #0b1a3d;
+  color: #fff;
+  font: inherit;
+}
+
+.controller__add label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.controller__add input {
+  width: 100%;
+}
+
+.controller__add button {
+  margin-top: 12px;
+}
+
+.controller__add p:last-child {
+  margin-bottom: 0;
+}
+
+/* Save: pinned to the bottom of the window, and highlighted while there are unsaved changes. */
+.controller__save {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px max(16px, calc((100vw - 640px) / 2 + 16px));
+  border-top: 1px solid var(--c-line);
+  background: #0b1a3d;
+}
+
+.controller__save--changed {
+  border-top-color: var(--c-accent);
+}
+
+.controller__save .controller__error {
+  margin: 0;
+}
+
+.controller__buttons {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
 }

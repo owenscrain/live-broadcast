@@ -11,6 +11,8 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@vercel/global-config": "^1.5.1",
+    "@vercel/oidc": "^3.8.10",
     "next": "^15.5.26",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

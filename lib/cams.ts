@@ -1,7 +1,7 @@
 /**
  * The live cams: public live streams on YouTube, each embedded with YouTube's own player (muted, no
- * controls), so the video streams from YouTube straight to the screen (no Vercel usage). The list is
- * kept here: edit it and redeploy to add, remove or reframe a stream.
+ * controls), so the video streams from YouTube straight to the screen (no Vercel usage). The list
+ * is managed on /controller; these are the streams it starts with.
  */
 export type Cam = {
   /** Its short ID, for ?cam= ("river"). */
@@ -25,10 +25,11 @@ export type Cam = {
    * edge; 0.5 when missing). Cutting more off the top zooms in.
    */
   crop?: { top?: number; centerX?: number };
-  /** Shown on /. The first one on is the one that plays; ?cam= picks any of them. */
+  /** Shown on screen (several take turns). */
   on: boolean;
 };
 
+/** The streams the controller starts with, until its first save. */
 export const CAMS: Cam[] = [
   { id: "river", label: "Chicago River", shortLabel: "River", videoId: "1hAugar3D9k", channelId: "UCj0wW84FJvt3i_gAI8RdRkg", on: true },
   // StreamTime Live runs many cams at once, so this one stays on its own video.
@@ -47,14 +48,6 @@ export const CAMS: Cam[] = [
 
 /** How much of the top of each picture is cut off by default, and the default point kept in the middle. */
 export const DEFAULT_CROP = { top: 0.13, centerX: 0.5 };
-
-/**
- * The cam to play: the one ?cam= names, or the first one switched on. One at a time: the Fire TV
- * Stick shows only one video at a time, so two players fight over it.
- */
-export function pickCam(cams: Cam[], id: string | null): Cam | null {
-  return cams.find((c) => c.id === id) ?? cams.find((c) => c.on) ?? null;
-}
 
 /**
  * Where a cam's player sits in a `width` x `height` space, in pixels, covering all of it: tall
@@ -82,4 +75,19 @@ export const isChannelId = (value: unknown): value is string => typeof value ===
 /** The player settings for a cam: autoplaying, muted, no controls, captions, related videos or keyboard. */
 export function camPlayerVars(origin: string): Record<string, string | number> {
   return { autoplay: 1, mute: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, playsinline: 1, rel: 0, origin, enablejsapi: 1 };
+}
+
+/** A YouTube video ID from a link ("watch?v=", "youtu.be/", "/live/", "/embed/", "/shorts/") or the bare ID. */
+export function youTubeVideoId(input: string): string | null {
+  const text = input.trim();
+  if (/^[\w-]{11}$/.test(text)) return text;
+  let url: URL;
+  try {
+    url = new URL(text.startsWith("http") ? text : `https://${text}`);
+  } catch {
+    return null;
+  }
+  if (!/(^|\.)(youtube\.com|youtube-nocookie\.com|youtu\.be)$/.test(url.hostname)) return null;
+  const id = url.hostname.endsWith("youtu.be") ? url.pathname.slice(1) : url.searchParams.get("v") ?? url.pathname.match(/\/(?:live|embed|shorts)\/([\w-]{11})/)?.[1];
+  return id && /^[\w-]{11}$/.test(id) ? id : null;
 }

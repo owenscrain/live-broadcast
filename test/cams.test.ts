@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAMS, camFrame, pickCam } from "@/lib/cams";
+import { camFrame, youTubeVideoId } from "@/lib/cams";
 
 describe("camFrame", () => {
   it("covers a full HD space with the top 13% cut off", () => {
@@ -24,11 +24,12 @@ describe("camFrame", () => {
   });
 });
 
-describe("pickCam", () => {
-  it("plays the cam ?cam= names, else the first one on", () => {
-    expect(pickCam(CAMS, "midway")?.id).toBe("midway");
-    expect(pickCam(CAMS, null)?.id).toBe("river");
-    expect(pickCam(CAMS, "nope")?.id).toBe("river");
-    expect(pickCam([], null)).toBeNull();
+describe("youTubeVideoId", () => {
+  it("reads the ID from any kind of YouTube link", () => {
+    expect(youTubeVideoId("https://www.youtube.com/watch?v=1hAugar3D9k&t=3")).toBe("1hAugar3D9k");
+    expect(youTubeVideoId("youtu.be/1hAugar3D9k")).toBe("1hAugar3D9k");
+    expect(youTubeVideoId("https://www.youtube.com/live/1hAugar3D9k?si=x")).toBe("1hAugar3D9k");
+    expect(youTubeVideoId("1hAugar3D9k")).toBe("1hAugar3D9k");
+    expect(youTubeVideoId("https://vimeo.com/1hAugar3D9k")).toBeNull();
   });
 });

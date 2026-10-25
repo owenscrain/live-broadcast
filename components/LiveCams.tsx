@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CAMS, CAMS_REFRESH_MS, camFrame, camPlayerVars, pickCam, type Cam, type LiveCamsResponse } from "@/lib/cams";
+import { CAMS, CAMS_REFRESH_MS, camFrame, camPlayerVars, type Cam, type LiveCamsResponse } from "@/lib/cams";
+import { DEFAULT_SETTINGS, camAt, type Settings, type SettingsResponse } from "@/lib/settings";
 import { YT_PLAYING, loadYouTubeApi, type YTPlayer } from "@/lib/youtube-player";
 
 /** A six-pointed star, as on the Chicago flag, on a 100 x 100 grid. */
@@ -15,6 +16,8 @@ const STALL_MS = 15_000;
 const CHECK_MS = 3_000;
 /** After a failure, the "offline" note shows this long, then the cam is tried again. */
 const RETRY_MS = 2 * 60_000;
+/** How often the screen checks for new settings from /controller. */
+const SETTINGS_REFRESH_MS = 60_000;
 
 const STATE_NAMES: Record<number, string> = { [-1]: "unstarted", 0: "ended", 1: "playing", 2: "paused", 3: "buffering", 5: "cued" };
 /** Unstarted, paused or cued: the states a "play" nudge is for. */
@@ -122,8 +125,8 @@ function CamPlayer({
 
 /**
  * The whole screen: one live cam covering everything above the CHICAGO LIVE bar (the picture
- * cropped to fit). The cam is the one ?cam= names, or the first one switched on in lib/cams.ts. The
- * video fades in once it's playing; if it fails, an "offline" note shows for 2 minutes and then it's
+ * cropped to fit). The cams are the ones switched on in /controller, taking turns when there are
+ * several (?cam= picks one instead). The video fades in once it's playing; if it fails, an "offline" note shows for 2 minutes and then it's
  * tried again. A stream that follows its channel is looked up through /api/live-cams (every 10
  * minutes, and after a failure), since a restarted stream comes back under a new video ID. Under the
  * video, the dark blue CHICAGO LIVE bar, with a pulsing Chicago-flag star, the cam's name and the
@@ -135,10 +138,6 @@ export function LiveCams() {
     const search = new URLSearchParams(window.location.search);
     setParams({ cam: search.get("cam"), debug: search.has("debug") });
   }, []);
-  const stream = params && pickCam(CAMS, params.cam);
-  const channel = stream && stream.followChannel !== false ? stream.channelId : null;
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  const cam = stream && { ...stream, videoId: (channel && currentId) || stream.videoId };
 
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -147,11 +146,31 @@ export function LiveCams() {
     return () => clearInterval(id);
   }, []);
 
+  // What /controller saved, checked every minute. If it can't be had at first, the built-in cams.
+  const [settings, setSettings] = useState<Settings | null>(null);
+  useEffect(() => {
+    const load = () =>
+      fetch("/api/settings", { cache: "no-store" })
+        .then((r) => r.json() as Promise<SettingsResponse>)
+        .then((res) => setSettings((s) => (res.ok ? res.settings : s ?? DEFAULT_SETTINGS)))
+        .catch(() => setSettings((s) => s ?? DEFAULT_SETTINGS));
+    load();
+    const id = setInterval(load, SETTINGS_REFRESH_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  const picked = params?.cam ? (settings?.cams ?? CAMS).find((c) => c.id === params.cam) ?? CAMS.find((c) => c.id === params.cam) : null;
+  const stream = picked ?? (settings && now !== null ? camAt(settings, now) : null);
+  const channel = stream && stream.followChannel !== false ? stream.channelId : null;
+  const [currentIds, setCurrentIds] = useState<Record<string, string | null>>({});
+  const currentId = channel ? currentIds[channel] : null;
+  const cam = stream && { ...stream, videoId: currentId || stream.videoId };
+
   const lookUp = useCallback(async () => {
     if (!channel) return;
     try {
       const res = (await fetch(`/api/live-cams?channels=${channel}`).then((r) => r.json())) as LiveCamsResponse;
-      if (res.ok) setCurrentId(res.streams[channel] ?? null);
+      if (res.ok) setCurrentIds((ids) => ({ ...ids, [channel]: res.streams[channel] ?? null }));
     } catch {
       // Keep the stream we have.
     }
@@ -189,7 +208,7 @@ export function LiveCams() {
     }
   }, [failedAt, offline]);
 
-  if (now === null || !params) return <div className="live-cams" />;
+  if (now === null || !params || (!settings && !picked)) return <div className="live-cams" />;
   return (
     <div className="live-cams" aria-label={cam ? `Live cam: ${cam.label}` : "Live cams off"}>
       <div className="live-cams__screen">
